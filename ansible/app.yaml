@@ -1,0 +1,71 @@
+---
+- hosts: todoapp
+  vars:
+    todoapp_user: todoapp
+  tasks:
+    - name: make sure todoapp user exists
+      become: yes
+      user:
+        name: "{{ todoapp_user }}"
+    - name: Making  todoapp port is open in the firewall
+      become: yes
+      firewalld:
+        port: 8080/tcp
+        permanent: true
+        immediate: yes
+        state: enabled
+    - name: Download NodeJS repo file
+      get_url:
+        url: https://rpm.nodesource.com/setup_14.x
+        dest: /tmp/install_node_script
+      register: nodejs_setup_task
+    - name: Run the NodeJS install script
+      when: nodejs_setup_task.changed
+      become: yes
+      shell: bash /tmp/install_node_script
+    - name: MAke sure that nodejs is installed
+      become: yes
+      package:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - git
+        - nodejs
+    - name: Make sure the app files exists
+      become: yes
+      become_user: "{{ todoapp_user }}"
+      git:
+        repo: https://github.com/timoguic/ACIT4640-todo-app.git
+        dest: /home/{{ todoapp_user }}/app
+        force: yes
+    - name: make sure dependecneis installed
+      become: yes
+      become_user: "{{ todoapp_user }}"
+      shell: npm install
+      args:
+        chdir: /home/{{ todoapp_user }}/app
+    - name: Make sure config/database/js changed
+      become: yes
+      replace:
+        path: /home/{{ todoapp_user }}/app/config/database.js
+        regexp: 'localhost/CHANGEME'
+        replace: '192.168.150.20/acit4640'
+      register: database_js_task
+    - name: provision the todoapp service
+      become: yes
+      template:
+        src: todoapp.j2
+        dest: /etc/systemd/system/todoapp.service
+    - name: Enable and start todoapp
+      become: yes
+      systemd:
+        name: todoapp
+        state: started
+        enabled: yes
+        daemon_reload: yes
+    - name: Make sure todoapp service is restarted when
+      become: yes
+      when: database_js_task.changed
+      systemd:
+        name: todoapp
+        state: restarted

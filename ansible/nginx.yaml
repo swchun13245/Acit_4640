@@ -1,0 +1,39 @@
+---
+- hosts: todohttp
+  tasks:
+    - name: Make sure nginx is installed
+      become: yes
+      package:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - git
+        - nginx
+    - name: Make sure app can be written
+      become: yes
+      file:
+        path: /app
+        state: directory
+        owner: admin
+    - name: Make sure the static files are available locally
+      git:
+        repo: https://github.com/timoguic/ACIT4640-todo-app.git
+        dest: /app
+    - name: provision nginx.conf
+      become: yes
+      copy:
+        src: ./files/nginx.conf
+        dest: /etc/nginx/nginx.conf
+      register: nginx_conf_task
+    - name: Make sure nginx is started and enabled
+      become: yes
+      systemd:
+        name: nginx
+        state: started
+        enabled: yes
+    - name: Make sure nginx is restarted if config file changed
+      become: yes
+      when: nginx_conf_task.changed
+      systemd:
+        name: nginx
+        state: restarted

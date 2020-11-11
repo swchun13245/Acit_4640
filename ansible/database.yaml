@@ -1,0 +1,51 @@
+---
+- hosts: tododb 
+  become: yes
+  tasks:
+    - name: Making sure mongod port is open in the firewall
+      firewalld:
+        port: 27017/tcp
+        permanent: true
+        immediate: yes
+        state: enabled
+    - name: Provision the Mongodb repository firewall
+      copy:
+        src: ./files/mongodbrepo.conf
+        dest: /etc/yum.repos.d/mongodb-org-4.4.repo
+    - name: make sure mongodb is installed
+      package:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - tar
+        - mongodb-org
+    - name: Make sure the service is started
+      systemd:
+        name: mongod
+        state: started
+        enabled: yes
+    - name: Download the export file for mongod
+      get_url:
+        url: https://acit4640.y.vu/docs/module06/resources/mongodb_ACIT4640.tgz
+        dest: /tmp/mongod_export.tgz
+        username: student
+        password: BCIT2020
+    - name: unpack the archive
+      unarchive:
+        src: /tmp/mongod_export.tgz
+        dest: /tmp
+        creates: /tmp/ACIT4640
+        remote_src: yes
+    - name: Make sure data is restored in Mongodb
+      shell: mongorestore -d acit4640 /tmp/ACIT4640
+    - name: Make sure mongod liststens on all interface
+      replace:
+        path: /etc/mongod.conf
+        regexp: 'bindIp: 127.0.0.1'
+        replace: 'bindIp: 0.0.0.0'
+      register: mongod_conf_task
+    - name: Make sure mongod changes are taken into account
+      when: mongod_conf_task.changed
+      systemd:
+        name: mongod
+        state: restarted
