@@ -1,4 +1,4 @@
-udo setenforce 0
+sudo setenforce 0
 sudo cp setup/selinux_config /etc/selinux/config
 sudo useradd todoapp
 sudo dnf install -y git
