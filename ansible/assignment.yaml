@@ -1,0 +1,98 @@
+---
+- hosts: localhost
+  vars:
+    AWS_PREFIX: ACIT4640
+    regions: us-west-2
+    zone: us-west-2c
+  tasks:
+    - import_tasks: ./aws/aws_setup.yaml
+      tags:
+        - never
+        - aws
+        - provision
+- hosts: aws_ec2
+  vars:
+    backend_db_name: assignment_db
+    backend_db_user: node_app
+    backend_db_password: password
+    backend_db_host: localhost
+    frontend_app_path: /frontend
+    frontend_user: centos
+    backend_user: backend_user
+    backend_app_path: /backend
+    backend_db_user: node_app
+  tasks:
+    - import_tasks: ./app/mysql_setup.yaml
+      tags:
+        - never
+        - application
+        - provision
+    - import_tasks: ./app/frontend_setup.yaml
+      tags:
+        - never
+        - application
+        - provision
+    - import_tasks: ./app/backend_setup.yaml
+      tags:
+        - never
+        - application
+        - provision
+- hosts: localhost
+  vars:
+    AWS_PREFIX: ACIT4640
+    regions: us-west-2
+    zone: us-west-2c
+  tasks:
+    - import_tasks: ./aws/aws_clean.yaml
+      tags:
+        - never
+        - clean
+- hosts: localhost
+  vars:
+    AWS_PREFIX: ACIT4640
+    regions: us-west-2
+    zone: us-west-2c
+  tasks:
+    - import_tasks: ./aws/aws_info.yaml
+      tags:
+        - always
+        - info
+- hosts: mysql
+  vars:
+    backend_db_name: assignment_db
+    backend_db_user: node_app
+    backend_db_password: password
+    backend_db_host: 192.168.150.10
+  tasks:
+    - import_tasks: ./app/mysql_setup.yaml
+      tags:
+        - vagrant_db
+        - never
+        - vagrant_provision
+- hosts: frontend
+  vars:
+    frontend_app_path: /frontend
+    frontend_user: admin
+    backend_db_host: 192.168.150.10
+  tasks:
+    - import_tasks: ./app/frontend_setup.yaml
+      tags:
+        - vagrant_frontend
+        - never
+        - vagrant_provision
+- hosts: backend
+  vars:
+    backend_user: backend_user
+    backend_app_path: /backend
+    backend_db_host: 192.168.150.20
+    backend_db_user: node_app
+    backend_db_password: password
+    backend_db_name: assignment_db
+  tasks:
+    - import_tasks: ./app/backend_setup.yaml
+      tags:
+        - vagrant_backend
+        - never
+        - vagrant_provision
+
+

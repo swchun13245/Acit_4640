@@ -1,0 +1,81 @@
+---
+- name: provision the vpc
+  ec2_vpc_net:
+    name: "{{ AWS_PREFIX }}_VPC"
+    cidr_block: 10.42.0.0/16
+    region: "{{ regions }}"
+  register: vpc_info
+- name: provision the subnet
+  ec2_vpc_subnet:
+    vpc_id: "{{ vpc_info.vpc.id }}"
+    cidr: 10.42.10.0/24
+    tags:
+      Name: "{{ AWS_PREFIX }}_SUBNET"
+    region: "{{ regions }}"
+    az: "{{ zone }}"
+  register: subnet_info          
+- name: provision the internet gateway
+  ec2_vpc_igw:
+    vpc_id: "{{ vpc_info.vpc.id }}"
+    tags:
+      Name: "{{ AWS_PREFIX }}_IGW"
+    region: "{{ regions }}"
+  register: igw_info
+- name: Provision the routing table
+  ec2_vpc_route_table:
+    vpc_id: "{{ vpc_info.vpc.id }}"
+    tags:
+      Name: "{{ AWS_PREFIX }}_RTB"
+    subnets:
+      - "{{ subnet_info.subnet.id }}"
+    routes:
+      - dest: 0.0.0.0/0
+        gateway_id: "{{ igw_info.gateway_id }}"
+    region: "{{ regions }}"
+- name: Get my public IP address
+  uri:
+    url: http://ifconfig.me/ip
+    return_content: yes
+  register: my_public_ip
+- name: Provision the security group
+  ec2_group:
+    name: "{{ AWS_PREFIX }}_SEGGRP"
+    description: security group for todoapp
+    vpc_id: "{{ vpc_info.vpc.id }}"
+    tags:
+      Name: "{{ AWS_PREFIX }}_SEGGRP"
+    rules:
+      - proto: tcp
+        ports:
+          - 80
+        cidr_ip: 0.0.0.0/0
+        rule_desc: allow all on port 80
+      - proto: tcp
+        ports:
+          - 22
+        cidr_ip: "{{ my_public_ip.content }}/32"
+        rule_desc: allow only my ip address
+    region: "{{ regions }}"
+  register: sgp
+- name: Provision the EC2 instance
+  ec2:
+    image: ami-0157b1e4eefd91fd7
+    instance_type: t2.micro
+    group: "{{ sgp.group_name }}"
+    assign_public_ip: yes
+    region: "{{ regions }}"
+    vpc_subnet_id: "{{ subnet_info.subnet.id }}"
+    key_name: acit4640
+    instance_tags:
+      Name: "{{ AWS_PREFIX }}_VM"
+    exact_count: 1
+    count_tag:
+      Name: "{{ AWS_PREFIX }}_VM"
+    wait: yes
+  register: ec2_info
+- name: Wait for the virtual machine to be up (SSH)
+  wait_for:
+    port: 22
+    host: "{{ ec2_info.tagged_instances[0].public_ip }}"
+- name: refresh ansible inventory
+  meta: refresh_inventory

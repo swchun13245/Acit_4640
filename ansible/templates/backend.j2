@@ -1,0 +1,15 @@
+[Unit]
+Description=backend app, ACIT4640_GRP_ASS
+After=network.target
+
+[Service]
+Environment=NODE_PORT=8080
+WorkingDirectory={{ backend_app_path }}
+Type=simple
+User={{ backend_user }}
+ExecStartPre=/bin/sleep 15
+ExecStart=/usr/bin/node {{ backend_app_path }}/server.js
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

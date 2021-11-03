@@ -1,0 +1,33 @@
+---
+- name: Get information about the instances
+  ec2_instance_info:
+    region: us-west-2
+    filters:
+      availability-zone: us-west-2c
+      instance-state-name: ['running']
+  register: ec2_list
+- name: check
+  debug:
+    msg: "{{ ec2_list.instances }}"
+- name: No instance is running
+  when: ec2_list.instances | length == 0
+  debug:
+    msg: "The ec2 instance is deleted or not created yet! Create the ec2 instance" 
+- name: Display the ip addresses
+  when: ec2_list.instances | length > 0
+  debug:
+    msg: "The instance is running under this settings: IP address: {{ ec2_list.instances[0].public_ip_address }} dns_name: {{ ec2_list.instances[0].public_dns_name }}"
+- name: Testing the url
+  when: ec2_list.instances | length > 0
+  uri:
+    url: "http://{{ ec2_list.instances[0].public_dns_name }}"
+    status_code: -1, 200
+  register: testing_info
+- name: Check the status
+  when: ec2_list.instances | length > 0 and testing_info.status == 200
+  debug:
+    msg: "The application is provisioned and the website is running successfully "
+- name: Checks provision status
+  when: ec2_list.instances | length > 0 and testing_info.status == -1
+  debug:
+    msg: "The application is not provisioned yet. Please install all the applications"
