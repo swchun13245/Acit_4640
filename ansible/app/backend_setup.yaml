@@ -1,0 +1,72 @@
+- name: Make sure backend user exists
+  become: yes
+  user:
+    name: "{{ backend_user }}"
+- name: Download NodeJS repo file
+  get_url:
+    url: https://rpm.nodesource.com/setup_14.x
+    dest: /tmp/install_node_script
+  register: nodejs_setup_task
+- name: Run the NodeJS install script
+  when: nodejs_setup_task.changed
+  become: yes
+  shell: bash /tmp/install_node_script
+- name: MAke sure that nodejs is installed
+  become: yes
+  package:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - git
+    - nodejs
+    - firewalld
+- name: Making sure nodejs port is open in the firewall
+  become: yes
+  firewalld:
+    port: 8080/tcp
+    permanent: true
+    immediate: yes
+    state: enabled
+- name: Make sure app can be written in the backend file path
+  become: yes
+  file:
+    path: "{{ backend_app_path }}"
+    state: directory
+    owner: "{{ backend_user }}"
+- name: Download the back end file
+  become: yes
+  become_user: "{{ backend_user }}"
+  git:
+    repo: https://github.com/bezkoder/nodejs-express-sequelize-mysql.git
+    dest: "{{ backend_app_path }}"
+    force: yes
+- name: Change the file permission of the back end file
+  become: yes
+  file:
+    path: "{{ backend_app_path }}"
+    state: directory
+    mode: "a+rx"
+- name: Provision the backend config
+  become: yes
+  template:
+    src: db_config.j2
+    dest: "{{ backend_app_path }}/app/config/db.config.js"
+  register: backend_task
+- name: Make sure dependencies installed
+  become: yes
+  become_user: "{{ backend_user }}"
+  shell: npm install
+  args:
+    chdir: "{{ backend_app_path }}"
+- name: Provision the backend service
+  become: yes
+  template:
+    src: backend.j2
+    dest: /etc/systemd/system/backend.service
+- name: Enable and start backend
+  become: yes
+  systemd:
+    name: backend
+    state: started
+    enabled: yes
+    daemon_reload: yes

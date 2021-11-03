@@ -1,0 +1,47 @@
+- name: Make sure mysql is installed
+  become: yes
+  package:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - mysql-server
+    - python3-PyMySQL
+    - firewalld
+- name: Make sure firewall service is started
+  become: yes
+  systemd:
+    name: firewalld
+    state: started
+    enabled: yes
+- name: Making sure mysql port is open in the firewall
+  become: yes
+  firewalld:
+    port: 3306/tcp
+    permanent: true
+    immediate: yes
+    state: enabled
+- name: Make sure http service is open in the firewall
+  become: yes
+  firewalld:
+      service: http
+      permanent: true
+      immediate: yes
+      state: enabled
+- name: Make sure mysql service is started
+  become: yes
+  systemd:
+    name: mysqld
+    state: started
+    enabled: yes
+- name: Create the mysql database
+  become: yes
+  mysql_db:
+    name: "{{ backend_db_name }}"
+    state: present
+- name: create the mysql user to run the database
+  become: yes
+  mysql_user:
+    name: "{{ backend_db_user }}"
+    password: "{{ backend_db_password }}"
+    host: "{{ backend_db_host }}"
+    priv: '{{ backend_db_name }}.*:ALL,GRANT'

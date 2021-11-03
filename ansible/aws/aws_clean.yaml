@@ -1,0 +1,82 @@
+---
+- name: Get information about all the instances
+  ec2_instance_info:
+    region: us-west-2
+    filters:
+      availability-zone: us-west-2c
+      instance-state-name: ['running']
+  register: ec2_list
+- name: Get information about the vc2
+  ec2_vpc_net_info:
+    filters:
+      "tag:Name": "{{ AWS_PREFIX }}_VPC"
+    region: "{{ regions }}"
+  register: vpc_info
+- name: Display the subnet infos
+  ec2_vpc_subnet_info:
+    region: "{{ regions }}"
+    filters:
+      "tag:Name": "{{ AWS_PREFIX }}_SUBNET"  
+  register: subnet_info
+- name: Get the information about the route table
+  ec2_vpc_route_table_info:
+    region: "{{ regions }}"
+    filters:
+      "tag:Name": "{{ AWS_PREFIX }}_RTB"
+  register: vpc_RTB
+- name: Get the security group name
+  ec2_group_info:
+    region: "{{ regions }}"
+    filters:
+      "tag:Name": "{{ AWS_PREFIX }}_SEGGRP"
+  register: vpc_sgp
+- name: Get the igw
+  ec2_vpc_igw_info:
+    region: "{{ regions }}"
+    filters:
+      "tag:Name": "{{ AWS_PREFIX }}_IGW"
+  register: vpc_igw
+- name: Terminate the ec2 instance
+  when: ec2_list.instances | selectattr('state','equalto','running') | list | count == 0
+  ec2:
+    state: 'absent'
+    instance_ids: '{{ ec2_list.instances[0].instance_id }}'
+    region: "{{ regions }}"
+    wait: yes
+- name: remove the security group
+  ec2_group:
+    region: "{{ regions }}"
+    group_id: "{{ vpc_sgp.security_groups[0].group_id }}"
+    state: absent
+- name: remove the igw
+  ec2_vpc_igw:
+    vpc_id: "{{ subnet_info.subnets[0].vpc_id }}"
+    tags:
+      Name: "{{ AWS_PREFIX }}_IGW"
+    state: absent
+    region: "{{ regions }}"
+- name: Remove the subnet
+  ec2_vpc_subnet:      
+    vpc_id: "{{ subnet_info.subnets[0].vpc_id }}"
+    cidr: 10.42.10.0/24
+    region: "{{ regions }}"
+    state: absent     
+- name: remove the route table
+  ec2_vpc_route_table:
+    vpc_id: "{{ subnet_info.subnets[0].vpc_id }}"
+    region: "{{ regions }}"
+    route_table_id: "{{ vpc_RTB.route_tables[0].id }}"
+    lookup: id
+    state: absent
+- name: remove the vpc
+  ec2_vpc_net:
+    name: "{{ AWS_PREFIX }}_VPC"
+    cidr_block: 10.42.0.0/16
+    region: "{{ regions }}"
+    state: absent
+      
+
+        
+
+
+
